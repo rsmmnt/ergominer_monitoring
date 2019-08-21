@@ -1,6 +1,8 @@
 #!/bin/bash
 # This script iterates over rigs and sends all mined solutions data
 # through a Telegram bot
+# also checks if mined block is present in block explorer via API
+# it can help identifying problems with your Ergo node
 # for Ergo Autolykos GPU miner
 # change your rig naming, log file name, telegram bot data and proxy if needed
 
@@ -30,10 +32,20 @@ do
 
     else
 
+        printf "$a" > tmp.txt
+        hex=$(cat tmp.txt | grep 'd =' | tail -1 | cut -c14- | sed 's/ //g')
         curl $PROXY -s -X POST $URL -d chat_id=$chat_id -d text="$a"
-
+        #convert hex D to decimal D
+        blockid=$(echo "ibase=16;$hex" | bc)
+        #check if block with this D is found in explorer
+        curl https://api.ergoplatform.com/blocks/byD/$blockid > tmp.txt
+        bhash=$(cat tmp.txt | awk -F'\"' '{print $8;}')
+        if [ -z "$bhash" ]
+        then
+            curl $PROXY -s -X POST $URL -d chat_id=$chat_id -d text="Something went wrong, cannot find block in the explorer"
+        else
+            curl $PROXY -s -X POST $URL -d chat_id=$chat_id -d text="https://explorer.ergoplatform.com/en/blocks/$bhash"
+        fi
     fi
 
 done
-
-
